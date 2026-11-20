@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Admin</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #111827);
+    --hint: var(--tg-theme-hint-color, #6b7280);
+    --card: var(--tg-theme-secondary-bg-color, #f3f4f6);
+    --btn: var(--tg-theme-button-color, #2563eb);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --ok: #16a34a;
+    --late: #dc2626;
+    --warn: #d97706;
+    --line: rgba(127,127,127,.25);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 14px; }
+  .wrap { width: 100%; max-width: 760px; padding-bottom: 110px; }
+  h1.title { font-size: 21px; margin: 2px 0 10px; }
+  button { font-family: inherit; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab { flex: 1; padding: 11px 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text);
+    font-size: 14px; font-weight: 700; cursor: pointer; position: relative; }
+  .tab.on { background: var(--btn); border-color: var(--btn); color: var(--btn-text); }
+  .badge { display: inline-block; min-width: 20px; padding: 1px 6px; margin-left: 5px; border-radius: 999px; background: var(--late);
+    color: #fff; font-size: 12px; font-weight: 800; }
+
+  /* date bar */
+  .datebar { display: flex; gap: 8px; align-items: center; }
+  .datebar input[type=date] { flex: 1; min-width: 0; padding: 11px 12px; font-size: 16px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .nav { width: 46px; height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text);
+    font-size: 24px; line-height: 1; cursor: pointer; }
+  .nav:disabled { opacity: .35; cursor: default; }
+  .chips { display: flex; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+  .chip { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text);
+    font-size: 14px; font-weight: 600; cursor: pointer; }
+  .chip.on { background: var(--btn); border-color: var(--btn); color: var(--btn-text); }
+  .dateText { font-size: 17px; font-weight: 700; margin-top: 10px; }
+  .summary { color: var(--hint); font-size: 14px; margin: 2px 0 10px; }
+
+  .banner { border-radius: 12px; padding: 12px 14px; margin: 0 0 12px; font-size: 14px; line-height: 1.45; }
+  .banner.ok { background: rgba(22,163,74,.12); border: 1px solid rgba(22,163,74,.35); }
+  .banner.info { background: var(--card); border: 1px solid var(--line); }
+  .banner .bh { font-weight: 700; margin-bottom: 4px; }
+  .banner .bl { color: var(--hint); word-break: break-word; }
+
+  /* staff list */
+  .selrow { display: flex; justify-content: space-between; align-items: center; margin: 6px 2px 8px; font-size: 14px; color: var(--hint); }
+  .selrow label { display: flex; gap: 8px; align-items: center; cursor: pointer; color: var(--text); font-weight: 600; }
+  .staff { display: flex; gap: 12px; align-items: flex-start; padding: 12px; margin-bottom: 8px; border-radius: 14px; background: var(--card);
+    border: 2px solid transparent; cursor: pointer; }
+  .staff.sel { border-color: var(--btn); }
+  .staff input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+  .staff .info { flex: 1; min-width: 0; }
+  .staff .nm { font-weight: 700; font-size: 16px; word-break: break-word; }
+  .staff .ps { color: var(--hint); font-size: 13px; }
+  .staff .sh { font-size: 13px; margin-top: 4px; }
+  .staff .stt { font-size: 13px; margin-top: 4px; font-weight: 700; }
+  .stt.ok { color: var(--ok); } .stt.late { color: var(--late); } .stt.warn { color: var(--warn); } .stt.off, .stt.idle { color: var(--hint); }
+  .staff .nt { font-size: 12px; margin-top: 3px; color: var(--warn); font-weight: 600; }
+  .pill { flex: none; align-self: flex-start; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; text-align: center; max-width: 150px; }
+  .pill.work { background: rgba(22,163,74,.15); color: var(--ok); }
+  .pill.off { background: rgba(217,119,6,.18); color: var(--warn); }
+  .pill.Approved, .pill.Notified { background: rgba(22,163,74,.15); color: var(--ok); }
+  .pill.Declined { background: rgba(220,38,38,.15); color: var(--late); }
+  .pill.Cancelled { background: rgba(127,127,127,.2); color: var(--hint); }
+  .pill small { display: block; font-weight: 500; font-size: 11px; opacity: .9; }
+
+  /* requests */
+  h3.sec { font-size: 15px; margin: 18px 2px 8px; color: var(--hint); }
+  .req { padding: 12px; border-radius: 14px; background: var(--card); margin-bottom: 10px; }
+  .req .rt { font-weight: 700; font-size: 15px; word-break: break-word; }
+  .req .rs { color: var(--hint); font-size: 13px; margin-top: 3px; word-break: break-word; }
+  .req .rb { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .req .rb .grow { flex: 1; }
+  .btn { border: 0; border-radius: 12px; padding: 11px 14px; font-size: 14px; font-weight: 700; cursor: pointer; background: var(--btn); color: var(--btn-text); }
+  .btn.good { background: var(--ok); color: #fff; }
+  .btn.bad { background: var(--late); color: #fff; }
+  .empty { color: var(--hint); font-size: 14px; padding: 10px 2px; }
+
+  /* week grid */
+  .weekbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .weekbar .range { flex: 1; text-align: center; font-weight: 700; font-size: 15px; }
+  .weekwrap { overflow-x: auto; border-radius: 12px; }
+  table.wk { border-collapse: separate; border-spacing: 4px; min-width: 780px; width: 100%; }
+  table.wk th { font-size: 12px; font-weight: 700; padding: 6px 4px; text-align: center; color: var(--hint); }
+  table.wk th.today { color: var(--btn); }
+  table.wk td.name { position: sticky; left: 0; background: var(--bg); z-index: 1; min-width: 110px; padding: 6px 6px 6px 2px; vertical-align: middle; }
+  table.wk td.name .n { font-weight: 700; font-size: 13px; }
+  table.wk td.name .p { font-size: 11px; color: var(--hint); }
+  td.cell { border-radius: 10px; padding: 7px 5px; text-align: center; vertical-align: top; min-width: 96px; }
+  td.cell .cs { font-size: 12px; font-weight: 700; word-break: break-word; }
+  td.cell .ct { font-size: 11px; color: var(--hint); margin-top: 2px; }
+  td.cell.tap { cursor: pointer; }
+  td.cell.past { opacity: .55; }
+  td.cell.today { outline: 2px solid var(--btn); }
+  td.cell.off { background: rgba(127,127,127,.25); }
+  td.cell.c0 { background: rgba(37,99,235,.20); } td.cell.c1 { background: rgba(234,88,12,.20); } td.cell.c2 { background: rgba(124,58,237,.20); }
+  td.cell.c3 { background: rgba(22,163,74,.20); } td.cell.c4 { background: rgba(219,39,119,.20); } td.cell.c5 { background: rgba(202,138,4,.22); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 12px; }
+  .legend span { padding: 4px 10px; border-radius: 999px; }
+  .legend .c0 { background: rgba(37,99,235,.20); } .legend .c1 { background: rgba(234,88,12,.20); } .legend .c2 { background: rgba(124,58,237,.20); }
+  .legend .c3 { background: rgba(22,163,74,.20); } .legend .c4 { background: rgba(219,39,119,.20); } .legend .c5 { background: rgba(202,138,4,.22); }
+  .legend .off { background: rgba(127,127,127,.25); }
+
+  /* bottom bar */
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 10px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--bg); border-top: 1px solid var(--line); }
+  .bar button { flex: 1; max-width: 270px; }
+  .act { border: 0; border-radius: 14px; padding: 15px 10px; font-size: 16px; font-weight: 700; background: var(--btn); color: var(--btn-text); cursor: pointer; }
+  .act:disabled { opacity: .4; cursor: default; }
+  .act.secondary { background: var(--card); color: var(--text); border: 1px solid var(--line); }
+  .act.good { background: var(--ok); } .act.bad { background: var(--late); }
+
+  /* dialogs */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+  .sheet { width: 100%; max-width: 560px; max-height: 88vh; overflow: auto; background: var(--bg); color: var(--text);
+    border-radius: 20px 20px 0 0; padding: 20px 18px calc(18px + env(safe-area-inset-bottom, 0px)); }
+  .sheet h2 { margin: 0 0 4px; font-size: 20px; }
+  .sheet .hint { color: var(--hint); font-size: 14px; margin: 0 0 14px; white-space: pre-line; }
+  .sheet .lbl { display: block; font-size: 13px; font-weight: 700; color: var(--hint); margin: 12px 0 6px; }
+  .sheet select, .sheet input[type=text] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .opt { display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-radius: 12px; background: var(--card); margin-bottom: 8px; cursor: pointer; font-size: 15px; }
+  .opt input { width: 18px; height: 18px; flex: none; }
+  .row-btns { display: flex; gap: 10px; margin-top: 18px; }
+  .row-btns .act { flex: 1; }
+  .err { color: var(--late); font-size: 14px; margin-top: 12px; }
+  .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+
+  /* message card */
+  .card { width: 100%; background: var(--card); border-radius: 20px; padding: 28px 20px; text-align: center; margin-top: 8vh; }
+  .icon { font-size: 52px; line-height: 1; margin-bottom: 10px; }
+  .icon.spin { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.12); opacity: .6; } }
+  .card h1 { font-size: 22px; margin: 0 0 8px; }
+  .card p { margin: 0 0 16px; color: var(--hint); font-size: 15px; line-height: 1.45; white-space: pre-line; }
+  .card.tone-warn h1 { color: var(--warn); }
+  .card.tone-error h1 { color: var(--late); }
+  .rows { margin: 0 0 16px; text-align: left; border-radius: 12px; background: var(--bg); overflow: hidden; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 14px; font-size: 14px; }
+  .row .k { color: var(--hint); } .row .v { font-weight: 700; user-select: text; }
+  pre.debug { margin: 0 0 16px; padding: 10px 12px; text-align: left; font-size: 12px; white-space: pre-wrap; word-break: break-word;
+    background: var(--bg); color: var(--hint); border-radius: 10px; user-select: text; }
+  .status { width: 100%; max-width: 760px; margin: 8px 0 100px; font-size: 12px; text-align: center; color: var(--hint); word-break: break-word; }
+  .status.good { color: var(--ok); } .status.bad { color: var(--late); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="wrap">
+
+    <div class="card" id="msgCard" hidden>
+      <div class="icon" id="mIcon">⏳</div>
+      <h1 id="mTitle"></h1>
+      <p id="mText"></p>
+      <div class="rows" id="mRows" hidden></div>
+      <pre class="debug" id="mDebug" hidden></pre>
+      <button class="act" id="mBtn" style="width:100%" hidden></button>
+    </div>
+
+    <div id="app" hidden>
+      <h1 class="title">📅 Admin</h1>
+      <div class="tabs">
+        <button class="tab on" id="tabBtnStaff">👥 Staff</button>
+        <button class="tab" id="tabBtnReq">🙋 Requests<span class="badge" id="reqBadge" hidden></span></button>
+        <button class="tab" id="tabBtnWeek">📆 Week</button>
+      </div>
+      <div class="banner" id="banner" hidden></div>
+
+      <!-- STAFF -->
+      <section id="paneStaff">
+        <div class="datebar">
+          <button class="nav" id="prev" aria-label="Previous day">‹</button>
+          <input type="date" id="date">
+          <button class="nav" id="next" aria-label="Next day">›</button>
+        </div>
+        <div class="chips">
+          <button class="chip" id="chipToday">Today</button>
+          <button class="chip" id="chipTomorrow">Tomorrow</button>
+        </div>
+        <div class="dateText" id="dateText"></div>
+        <div class="summary" id="summary"></div>
+        <div class="selrow">
+          <label><input type="checkbox" id="selAll"> Select all</label>
+          <span id="selCount"></span>
+        </div>
+        <div id="list"></div>
+      </section>
+
+      <!-- REQUESTS -->
+      <section id="paneReq" hidden><div id="reqBody"></div></section>
+
+      <!-- WEEK -->
+      <section id="paneWeek" hidden>
+        <div class="weekbar">
+          <button class="nav" id="wPrev" aria-label="Previous week">‹</button>
+          <div class="range" id="weekRange"></div>
+          <button class="nav" id="wNext" aria-label="Next week">›</button>
+        </div>
+        <div class="chips"><button class="chip" id="wThis">This week</button></div>
+        <div class="weekwrap" id="weekGrid"></div>
+        <div class="legend" id="legend"></div>
+        <div class="summary" style="margin-top:12px">Tap a day to change that person's shift or mark them off / working. 🔄 = different from the person's usual shift.</div>
+      </section>
+    </div>
+
+  </div>
+  <div class="status" id="status" hidden></div>
+</main>
+
+<div class="bar" id="bar" hidden>
+  <button class="act" id="btnShift" disabled>🔄 Change Shift</button>
+  <button class="act" id="btnOff" disabled>📅 Off / Work</button>
+</div>
+<div class="overlay" id="overlay" hidden><div class="sheet" id="sheet"></div></div>
+
+<script>
+/* ======================== SETTINGS (edit these) ======================== */
+const API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';  // the same /exec URL you use in index.html
+const DEBUG = true;            // true = show technical details on errors. Set to false when everything works.
+const PAGE_VERSION = 'admin v10';
+const API_TIMEOUT_MS = 30000;
+/* ======================================================================== */
+
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const $ = function (id) { return document.getElementById(id); };
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+let staffState = null;     // admin_state
+let reqData = null;        // admin_requests
+let weekData = null;       // admin_week
+let todayIso = '';
+let tab = 'staff';
+const selected = new Set();
+let busy = false;
+
+function haptic(type) { try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type); } catch (e) {} }
+
+function setStatus(ok, text) {
+  if (!DEBUG) return;
+  const s = $('status');
+  s.hidden = false;
+  s.className = 'status ' + (ok ? 'good' : 'bad');
+  s.textContent = text;
+}
+function shortUrl() {
+  const u = API_URL.replace(/^https?:\/\//, '');
+  return u.length > 46 ? u.slice(0, 28) + '…' + u.slice(-14) : u;
+}
+function addDays(iso, n) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/* ------------------------- message card ------------------------- */
+function showMsg(o) {
+  $('app').hidden = true;
+  $('bar').hidden = true;
+  $('msgCard').hidden = false;
+  $('msgCard').className = 'card' + (o.tone ? ' tone-' + o.tone : '');
+  $('mIcon').textContent = o.icon || '⏳';
+  $('mIcon').className = 'icon' + (o.spin ? ' spin' : '');
+  $('mTitle').textContent = o.title || '';
+  $('mText').textContent = o.text || '';
+  const rows = $('mRows');
+  rows.innerHTML = '';
+  if (o.rows && o.rows.length) {
+    o.rows.forEach(function (r) {
+      const row = el('div', 'row');
+      row.appendChild(el('span', 'k', r[0]));
+      row.appendChild(el('span', 'v', r[1]));
+      rows.appendChild(row);
+    });
+    rows.hidden = false;
+  } else { rows.hidden = true; }
+  const dbg = $('mDebug');
+  if (o.debug && DEBUG) { dbg.textContent = o.debug; dbg.hidden = false; } else { dbg.hidden = true; }
+  const b = $('mBtn');
+  b.hidden = !o.button;
+  b.textContent = o.button || '';
+  b.onclick = o.onClick || null;
+}
+
+/* ------------------------- Apps Script API ------------------------- */
+function apiError(kind, message) { const e = new Error(message); e.kind = kind; return e; }
+
+async function callApi(payload) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(function () { ctrl.abort(); }, API_TIMEOUT_MS);
+  let raw;
+  try {
+    // No custom headers on purpose: keeps it a "simple" request so the browser does not block it (CORS).
+    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ initData: tg.initData }, payload)), signal: ctrl.signal });
+    raw = await res.text();
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw apiError('TIMEOUT', 'No answer from the server after ' + (API_TIMEOUT_MS / 1000) + ' seconds.');
+    throw apiError('NETWORK', 'Request blocked or server unreachable (' + (e && e.message ? e.message : e) + ').');
+  } finally { clearTimeout(timer); }
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (e) { throw apiError('BAD_REPLY', 'Server did not return data. It replied: ' + raw.replace(/\s+/g, ' ').slice(0, 160)); }
+  if (!data || typeof data !== 'object') throw apiError('BAD_REPLY', 'Unexpected reply from server.');
+  return data;
+}
+
+function showApiError(err, retry) {
+  haptic('error');
+  let text = 'Could not reach the server. Check the internet and try again.';
+  if (err.kind === 'TIMEOUT') text = 'The server took too long to answer. Try again.';
+  if (err.kind === 'BAD_REPLY') text = 'The server sent an unexpected reply. Deploy a new version of the Apps Script.';
+  setStatus(false, PAGE_VERSION + ' · Server NOT reachable ❌ — ' + err.message);
+  showMsg({ icon: '📶', tone: 'warn', title: 'Connection problem', text: text, button: 'Try Again', onClick: retry,
+            debug: (err.message || String(err)) + '\nAPI: ' + shortUrl() });
+}
+
+function handleAdminError(res, retry) {
+  haptic('error');
+  if (res.code === 'NOT_ADMIN') {
+    showMsg({ icon: '🔒', tone: 'warn', title: 'Not an admin yet',
+      text: 'Copy this Telegram ID into the Settings tab of the attendance sheet (row "Admin Telegram User ID(s)"), then tap Check Again.',
+      rows: [['Your Telegram ID', String(res.userId)]], button: 'Check Again', onClick: retry });
+    return;
+  }
+  showMsg({ icon: '🔄', tone: 'warn', title: 'Please reopen', text: res.message || 'Please try again.', debug: res.code || '',
+            button: 'Try Again', onClick: retry });
+}
+
+/* ------------------------- tabs ------------------------- */
+function setBadge(n) {
+  const b = $('reqBadge');
+  b.textContent = String(n);
+  b.hidden = !n;
+}
+
+function switchTab(name) {
+  tab = name;
+  $('tabBtnStaff').className = 'tab' + (name === 'staff' ? ' on' : '');
+  $('tabBtnReq').className = 'tab' + (name === 'req' ? ' on' : '');
+  $('tabBtnWeek').className = 'tab' + (name === 'week' ? ' on' : '');
+  $('paneStaff').hidden = name !== 'staff';
+  $('paneReq').hidden = name !== 'req';
+  $('paneWeek').hidden = name !== 'week';
+  $('bar').hidden = name !== 'staff';
+  $('banner').hidden = true;
+  if (name === 'staff') loadStaff(staffState ? staffState.dateIso : '', false);
+  if (name === 'req') loadReq();
+  if (name === 'week') loadWeek(weekData ? weekData.week.startIso : todayIso);
+}
+
+/* ============================ STAFF TAB ============================ */
+async function loadStaff(iso, first) {
+  if (first) showMsg({ icon: '⏳', spin: true, title: 'Loading…', text: 'Getting the schedule.' });
+  else $('summary').textContent = 'Loading…';
+  try {
+    const res = await callApi({ action: 'admin_state', date: iso || '' });
+    setStatus(true, PAGE_VERSION + ' · Server connected ✅');
+    if (res.ok) { staffState = res.state; todayIso = res.state.todayIso; setBadge(res.state.pendingTotal); showApp(); return; }
+    handleAdminError(res, function () { loadStaff('', true); });
+  } catch (err) { showApiError(err, function () { loadStaff(iso, true); }); }
+}
+
+function showApp() {
+  const st = staffState;
+  $('msgCard').hidden = true;
+  $('app').hidden = false;
+  $('bar').hidden = tab !== 'staff';
+  const d = $('date');
+  d.min = st.todayIso;
+  d.value = st.dateIso;
+  $('prev').disabled = st.dateIso <= st.todayIso;
+  $('chipToday').className = 'chip' + (st.dateIso === st.todayIso ? ' on' : '');
+  $('chipTomorrow').className = 'chip' + (st.dateIso === addDays(st.todayIso, 1) ? ' on' : '');
+  $('dateText').textContent = st.dateText;
+  $('summary').textContent = 'Working ' + st.working + '  ·  Off ' + st.off;
+  const names = st.staff.map(function (s) { return s.name; });
+  Array.from(selected).forEach(function (n) { if (names.indexOf(n) === -1) selected.delete(n); });
+  renderList();
+}
+
+function renderList() {
+  const list = $('list');
+  list.innerHTML = '';
+  staffState.staff.forEach(function (s) {
+    const row = el('label', 'staff' + (selected.has(s.name) ? ' sel' : ''));
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = selected.has(s.name);
+    cb.addEventListener('change', function () {
+      if (cb.checked) selected.add(s.name); else selected.delete(s.name);
+      row.className = 'staff' + (cb.checked ? ' sel' : '');
+      updateBar();
+    });
+    const info = el('div', 'info');
+    info.appendChild(el('div', 'nm', s.name));
+    if (s.position) info.appendChild(el('div', 'ps', s.position));
+    info.appendChild(el('div', 'sh', '🕓 ' + s.shiftName + ' · ' + s.shiftTime + (s.hasBreak ? '' : ' · no break') + (s.shiftChanged ? '  🔄 new shift' : '')));
+    if (s.status) info.appendChild(el('div', 'stt ' + (s.tone || ''), s.status + (s.inTime ? ' · in ' + s.inTime : '')));
+    const notes = [];
+    if (s.lateMinutes) notes.push('📝 Late notice: ' + s.lateMinutes + ' min');
+    if (s.pendingOff) notes.push('🙋 Day-off request waiting');
+    if (notes.length) info.appendChild(el('div', 'nt', notes.join('   ')));
+    const pill = el('div', 'pill ' + (s.off ? 'off' : 'work'), s.off ? '🌴 Off' : '✅ Working');
+    if (s.off && s.reason) pill.appendChild(el('small', '', s.reason));
+    row.appendChild(cb);
+    row.appendChild(info);
+    row.appendChild(pill);
+    list.appendChild(row);
+  });
+  updateBar();
+}
+
+function updateBar() {
+  const n = selected.size;
+  const total = staffState ? staffState.staff.length : 0;
+  $('selCount').textContent = n ? n + ' selected' : '';
+  $('selAll').checked = total > 0 && n === total;
+  $('btnShift').disabled = !n;
+  $('btnOff').disabled = !n;
+}
+
+/* ============================ REQUESTS TAB ============================ */
+async function loadReq() {
+  $('reqBody').innerHTML = '';
+  $('reqBody').appendChild(el('div', 'empty', 'Loading…'));
+  try {
+    const res = await callApi({ action: 'admin_requests' });
+    if (res.ok) { reqData = res.data; setBadge(reqData.pending.length); renderReq(); return; }
+    handleAdminError(res, function () { loadStaff('', true); });
+  } catch (err) { showApiError(err, function () { loadReq(); }); }
+}
+
+function reqCard(r, withButtons) {
+  const c = el('div', 'req');
+  c.appendChild(el('div', 'rt', (r.type === 'Late' ? '⏰ ' : '🌴 ') + r.name + (r.position ? ' · ' + r.position : '')));
+  c.appendChild(el('div', 'rs', r.text));
+  if (r.reason) c.appendChild(el('div', 'rs', 'Reason: ' + r.reason));
+  if (!withButtons && r.type === 'Day Off') {
+    if (r.adminNote) c.appendChild(el('div', 'rs', '💬 ' + r.adminNote));
+    const rb = el('div', 'rb');
+    rb.appendChild(el('span', 'pill ' + r.status, r.status));
+    if (r.decidedBy && r.status !== 'Cancelled') rb.appendChild(el('span', 'rs', 'by ' + r.decidedBy));
+    c.appendChild(rb);
+  }
+  if (withButtons) {
+    const rb = el('div', 'rb');
+    const ok = el('button', 'btn good', '✅ Approve'); ok.addEventListener('click', function () { openDecideDialog(r, 'approve'); });
+    const no = el('button', 'btn bad', '❌ Decline'); no.addEventListener('click', function () { openDecideDialog(r, 'decline'); });
+    rb.appendChild(ok); rb.appendChild(no);
+    c.appendChild(rb);
+  }
+  return c;
+}
+
+function renderReq() {
+  const body = $('reqBody');
+  body.innerHTML = '';
+  body.appendChild(el('h3', 'sec', '⏳ Waiting for your answer (' + reqData.pending.length + ')'));
+  if (!reqData.pending.length) body.appendChild(el('div', 'empty', 'No day-off requests waiting. 🎉'));
+  reqData.pending.forEach(function (r) { body.appendChild(reqCard(r, true)); });
+
+  body.appendChild(el('h3', 'sec', '⏰ Late notices for today (' + reqData.lateToday.length + ')'));
+  if (!reqData.lateToday.length) body.appendChild(el('div', 'empty', 'Nobody has sent a late notice today.'));
+  reqData.lateToday.forEach(function (r) {
+    const c = el('div', 'req');
+    c.appendChild(el('div', 'rt', '⏰ ' + r.name + (r.position ? ' · ' + r.position : '')));
+    c.appendChild(el('div', 'rs', r.minutes + ' min late' + (r.reason ? ' · ' + r.reason : '')));
+    body.appendChild(c);
+  });
+
+  body.appendChild(el('h3', 'sec', 'Recent decisions'));
+  if (!reqData.recent.length) body.appendChild(el('div', 'empty', 'Nothing decided yet.'));
+  reqData.recent.forEach(function (r) { body.appendChild(reqCard(r, false)); });
+}
+
+function openDecideDialog(r, decision) {
+  const approve = decision === 'approve';
+  openSheet(function (sh) {
+    sh.appendChild(el('h2', '', approve ? '✅ Approve day off' : '❌ Decline day off'));
+    sh.appendChild(el('p', 'hint', r.name + '\n' + r.text + (r.reason ? '\nReason: ' + r.reason : '')));
+    sh.appendChild(el('label', 'lbl', 'Note for the group (optional)'));
+    const note = document.createElement('input');
+    note.type = 'text'; note.id = 'fNote'; note.maxLength = 120; note.placeholder = approve ? 'e.g. enjoy your day' : 'e.g. we are short of staff that day';
+    sh.appendChild(note);
+    sh.appendChild(el('div', 'lbl', ''));
+    sh.appendChild(checkbox('fNotify', '📣 Send the decision to the Telegram group', true));
+    const apply = buttonsRow(sh, approve ? 'Approve' : 'Decline');
+    apply.className = 'act ' + (approve ? 'good' : 'bad');
+    apply.onclick = async function () {
+      if (busy) return;
+      busy = true; setSheetBusy(true, approve ? 'Approve' : 'Decline'); $('sheetErr').hidden = true;
+      const notify = $('fNotify').checked;
+      try {
+        const res = await callApi({ action: 'admin_decide', id: r.id, decision: decision, note: $('fNote').value, notify: notify });
+        busy = false;
+        if (res.ok) {
+          closeSheet(); haptic('success');
+          reqData = res.data; setBadge(reqData.pending.length); renderReq();
+          const bits = [res.status + ' · ' + r.name];
+          if (approve) bits.push(res.applied + ' day(s) added to the schedule');
+          bits.push(notify ? (res.notified ? '📣 group alerted' : '⚠️ group NOT alerted (check the group ID in Settings)') : 'no alert sent');
+          showBannerLines(bits[0] + ' · ' + bits.slice(1).join(' · '), [], true);
+          return;
+        }
+        haptic('error');
+        setSheetBusy(false, approve ? 'Approve' : 'Decline');
+        showSheetError(res.message || 'Could not save the decision.');
+        if (res.data) { reqData = res.data; setBadge(reqData.pending.length); renderReq(); }
+      } catch (e) { busy = false; setSheetBusy(false, approve ? 'Approve' : 'Decline'); showSheetError('Connection problem: ' + e.message); }
+    };
+  });
+}
+
+/* ============================ WEEK TAB ============================ */
+async function loadWeek(startIso) {
+  $('weekGrid').innerHTML = '';
+  $('weekGrid').appendChild(el('div', 'empty', 'Loading…'));
+  try {
+    const res = await callApi({ action: 'admin_week', start: startIso || '' });
+    if (res.ok) { weekData = res; todayIso = res.todayIso; renderWeek(); return; }
+    handleAdminError(res, function () { loadStaff('', true); });
+  } catch (err) { showApiError(err, function () { loadWeek(startIso); }); }
+}
+
+function renderWeek() {
+  const wk = weekData.week;
+  $('weekRange').textContent = wk.rangeText;
+  $('wThis').className = 'chip' + (wk.startIso <= todayIso && todayIso <= wk.endIso ? ' on' : '');
+  const idx = {};
+  wk.shifts.forEach(function (n, i) { idx[n] = i; });
+
+  const table = el('table', 'wk');
+  const head = document.createElement('tr');
+  head.appendChild(el('th', '', 'Staff'));
+  wk.days.forEach(function (d) {
+    const th = el('th', d.iso === todayIso ? 'today' : '', d.dow + ' ' + d.label);
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+
+  wk.staff.forEach(function (s) {
+    const tr = document.createElement('tr');
+    const nm = el('td', 'name');
+    nm.appendChild(el('div', 'n', s.name));
+    if (s.position) nm.appendChild(el('div', 'p', s.position));
+    tr.appendChild(nm);
+    s.cells.forEach(function (c, i) {
+      const day = wk.days[i];
+      const past = c.iso < todayIso;
+      const td = el('td', 'cell ' + (c.off ? 'off' : 'c' + ((idx[c.shiftName] || 0) % 6)) + (past ? ' past' : ' tap') + (c.iso === todayIso ? ' today' : ''));
+      if (c.off) {
+        td.appendChild(el('div', 'cs', '🌴 OFF'));
+        if (c.reason && c.reason !== 'Weekly day off') td.appendChild(el('div', 'ct', c.reason));
+      } else {
+        td.appendChild(el('div', 'cs', c.shiftName + (c.changed ? ' 🔄' : '')));
+        td.appendChild(el('div', 'ct', c.time + (c.hasBreak ? '' : ' · no break')));
+      }
+      if (!past) td.addEventListener('click', function () { openCellSheet(s.name, day, c); });
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  const grid = $('weekGrid');
+  grid.innerHTML = '';
+  grid.appendChild(table);
+
+  const legend = $('legend');
+  legend.innerHTML = '';
+  wk.shifts.forEach(function (n, i) { legend.appendChild(el('span', 'c' + (i % 6), n)); });
+  legend.appendChild(el('span', 'off', '🌴 Off'));
+}
+
+function openCellSheet(name, day, c) {
+  const when = day.dow + ' ' + day.label;
+  openSheet(function (sh) {
+    sh.appendChild(el('h2', '', name));
+    sh.appendChild(el('p', 'hint', when + '\n' + (c.off ? '🌴 Off' + (c.reason ? ' – ' + c.reason : '') : c.shiftName + ' · ' + c.time)));
+    const box = el('div', 'actions');
+    const a = el('button', 'act', '🔄 Change shift'); a.onclick = function () { openShiftDialog([name], day.iso, when); };
+    const b = el('button', 'act ' + (c.off ? 'good' : 'bad'), c.off ? '✅ Mark as WORKING' : '🌴 Mark as OFF');
+    b.onclick = function () { openOffDialog([name], day.iso, when, c.off ? 'work' : 'off'); };
+    const x = el('button', 'act secondary', 'Close'); x.onclick = closeSheet;
+    box.appendChild(a); box.appendChild(b); box.appendChild(x);
+    sh.appendChild(box);
+  });
+}
+
+/* ============================ dialogs ============================ */
+function openSheet(build) {
+  const sh = $('sheet');
+  sh.innerHTML = '';
+  build(sh);
+  $('overlay').hidden = false;
+}
+function closeSheet() { $('overlay').hidden = true; }
+
+function radio(name, value, text, checked) {
+  const lab = el('label', 'opt');
+  const r = document.createElement('input');
+  r.type = 'radio'; r.name = name; r.value = value; r.checked = !!checked;
+  lab.appendChild(r);
+  lab.appendChild(el('span', '', text));
+  return lab;
+}
+function checkbox(id, text, checked) {
+  const lab = el('label', 'opt');
+  const c = document.createElement('input');
+  c.type = 'checkbox'; c.id = id; c.checked = !!checked;
+  lab.appendChild(c);
+  lab.appendChild(el('span', '', text));
+  return lab;
+}
+function chosen(name) {
+  const r = document.querySelector('input[name="' + name + '"]:checked');
+  return r ? r.value : '';
+}
+function showSheetError(msg) { const e = $('sheetErr'); if (e) { e.textContent = msg; e.hidden = false; } }
+function setSheetBusy(b, label) { const a = $('sheetApply'); if (a) { a.disabled = b; a.textContent = b ? 'Applying…' : (label || 'Apply'); } }
+
+function buttonsRow(sh, label) {
+  const err = el('div', 'err'); err.id = 'sheetErr'; err.hidden = true;
+  sh.appendChild(err);
+  const row = el('div', 'row-btns');
+  const cancel = el('button', 'act secondary', 'Cancel');
+  cancel.onclick = closeSheet;
+  const apply = el('button', 'act', label || 'Apply');
+  apply.id = 'sheetApply';
+  row.appendChild(cancel);
+  row.appendChild(apply);
+  sh.appendChild(row);
+  return apply;
+}
+
+function openShiftDialog(names, iso, when) {
+  if (!names.length) return;
+  const shifts = (staffState && staffState.shifts) || (weekData && weekData.week.shifts.map(function (n) { return { name: n, label: n }; })) || [];
+  openSheet(function (sh) {
+    sh.appendChild(el('h2', '', '🔄 Change shift'));
+    sh.appendChild(el('p', 'hint', (names.length === 1 ? names[0] : names.length + ' staff selected') + ' · ' + when));
+    sh.appendChild(el('label', 'lbl', 'New shift'));
+    const sel = document.createElement('select');
+    sel.id = 'fShift';
+    shifts.forEach(function (x) { const o = document.createElement('option'); o.value = x.name; o.textContent = x.label; sel.appendChild(o); });
+    sh.appendChild(sel);
+    sh.appendChild(el('label', 'lbl', 'How long'));
+    sh.appendChild(radio('scope', 'from', 'From this date onward', true));
+    sh.appendChild(radio('scope', 'only', 'Only on this date (then back to the old shift)', false));
+    sh.appendChild(el('label', 'lbl', 'Note (optional, shown in the group message)'));
+    const note = document.createElement('input');
+    note.type = 'text'; note.id = 'fNote'; note.maxLength = 120; note.placeholder = 'e.g. covering for Sokha';
+    sh.appendChild(note);
+    sh.appendChild(el('div', 'lbl', ''));
+    sh.appendChild(checkbox('fNotify', '📣 Send an alert to the Telegram group', true));
+    buttonsRow(sh, 'Apply').onclick = function () {
+      submitApply(names, iso, { kind: 'shift', shift: $('fShift').value, scope: chosen('scope'), note: $('fNote').value, notify: $('fNotify').checked });
+    };
+  });
+}
+
+function openOffDialog(names, iso, when, preset) {
+  if (!names.length) return;
+  const types = (staffState && staffState.leaveTypes) || ['Day Off', 'Annual Leave', 'Sick Leave', 'Public Holiday'];
+  openSheet(function (sh) {
+    sh.appendChild(el('h2', '', '📅 Day off / working'));
+    sh.appendChild(el('p', 'hint', (names.length === 1 ? names[0] : names.length + ' staff selected') + ' · ' + when));
+    sh.appendChild(radio('kind', 'off', '🌴 Mark as OFF on this date', preset !== 'work'));
+    sh.appendChild(radio('kind', 'work', '✅ Mark as WORKING on this date', preset === 'work'));
+    const typeBox = el('div'); typeBox.id = 'typeBox';
+    typeBox.hidden = preset === 'work';
+    typeBox.appendChild(el('label', 'lbl', 'Type of day off'));
+    const sel = document.createElement('select'); sel.id = 'fType';
+    types.forEach(function (t) { const o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); });
+    typeBox.appendChild(sel);
+    sh.appendChild(typeBox);
+    sh.appendChild(el('label', 'lbl', 'Note (optional, shown in the group message)'));
+    const note = document.createElement('input');
+    note.type = 'text'; note.id = 'fNote'; note.maxLength = 120; note.placeholder = 'e.g. fever, family event';
+    sh.appendChild(note);
+    sh.appendChild(el('div', 'lbl', ''));
+    sh.appendChild(checkbox('fNotify', '📣 Send an alert to the Telegram group', true));
+    sh.querySelectorAll('input[name="kind"]').forEach(function (r) {
+      r.addEventListener('change', function () { typeBox.hidden = chosen('kind') !== 'off'; });
+    });
+    buttonsRow(sh, 'Apply').onclick = function () {
+      submitApply(names, iso, { kind: chosen('kind'), offType: $('fType').value, note: $('fNote').value, notify: $('fNotify').checked });
+    };
+  });
+}
+
+/* ============================ apply a change ============================ */
+async function submitApply(names, iso, extra) {
+  if (busy) return;
+  busy = true;
+  setSheetBusy(true);
+  const err = $('sheetErr');
+  if (err) err.hidden = true;
+  try {
+    const res = await callApi(Object.assign({ action: 'admin_apply', date: iso, names: names }, extra));
+    busy = false;
+    if (res.ok) {
+      closeSheet();
+      selected.clear();
+      haptic('success');
+      if (tab === 'week') await loadWeek(weekData.week.startIso);
+      else { staffState = res.state; setBadge(res.state.pendingTotal); showApp(); }
+      showBanner(res);
+      return;
+    }
+    haptic('error');
+    setSheetBusy(false);
+    showSheetError(res.message || 'Could not apply the change.');
+  } catch (e) {
+    busy = false;
+    setSheetBusy(false);
+    showSheetError('Connection problem: ' + e.message);
+  }
+}
+
+function showBannerLines(head, lines, ok) {
+  const b = $('banner');
+  b.innerHTML = '';
+  b.appendChild(el('div', 'bh', head));
+  lines.forEach(function (l) { b.appendChild(el('div', 'bl', l)); });
+  b.className = 'banner ' + (ok ? 'ok' : 'info');
+  b.hidden = false;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showBanner(res) {
+  if (res.changed) {
+    const alertText = res.notifyRequested
+      ? (res.notified ? ' · 📣 group alerted' : ' · ⚠️ group NOT alerted (check the group ID in Settings)')
+      : ' · no alert sent';
+    showBannerLines('✅ ' + res.changed + ' changed' + (res.unchanged ? ' · ' + res.unchanged + ' already set' : '') + alertText,
+      res.results.filter(function (r) { return r.changed; }).map(function (r) { return r.name + ': ' + r.beforeText + ' → ' + r.afterText; }), true);
+  } else {
+    showBannerLines('ℹ️ Nothing to change', ['Everyone selected was already set that way.'], false);
+  }
+}
+
+/* ============================ wiring ============================ */
+$('tabBtnStaff').addEventListener('click', function () { switchTab('staff'); });
+$('tabBtnReq').addEventListener('click', function () { switchTab('req'); });
+$('tabBtnWeek').addEventListener('click', function () { switchTab('week'); });
+
+$('date').addEventListener('change', function () { if ($('date').value) loadStaff($('date').value, false); });
+$('prev').addEventListener('click', function () { loadStaff(addDays(staffState.dateIso, -1), false); });
+$('next').addEventListener('click', function () { loadStaff(addDays(staffState.dateIso, 1), false); });
+$('chipToday').addEventListener('click', function () { loadStaff(staffState.todayIso, false); });
+$('chipTomorrow').addEventListener('click', function () { loadStaff(addDays(staffState.todayIso, 1), false); });
+$('selAll').addEventListener('change', function () {
+  if ($('selAll').checked) staffState.staff.forEach(function (s) { selected.add(s.name); }); else selected.clear();
+  renderList();
+});
+$('btnShift').addEventListener('click', function () { openShiftDialog(Array.from(selected), staffState.dateIso, staffState.dateText); });
+$('btnOff').addEventListener('click', function () { openOffDialog(Array.from(selected), staffState.dateIso, staffState.dateText); });
+
+$('wPrev').addEventListener('click', function () { loadWeek(addDays(weekData.week.startIso, -7)); });
+$('wNext').addEventListener('click', function () { loadWeek(addDays(weekData.week.startIso, 7)); });
+$('wThis').addEventListener('click', function () { loadWeek(todayIso); });
+
+$('overlay').addEventListener('click', function (e) { if (e.target === $('overlay') && !busy) closeSheet(); });
+
+(function init() {
+  if (!tg || !tg.initData) {
+    showMsg({ icon: '📵', tone: 'warn', title: 'Open from Telegram',
+      text: 'This page only works inside Telegram. Open it from the admin link of your attendance bot.' });
+    return;
+  }
+  if (API_URL.indexOf('https://script.google.com/') !== 0) {
+    showMsg({ icon: '🛠️', tone: 'error', title: 'Not configured',
+      text: 'API_URL at the top of admin.html must be your Apps Script Web App URL (starting with https://script.google.com/ and ending in /exec).' });
+    return;
+  }
+  loadStaff('', true);
+})();
+</script>
+</body>
+</html>
