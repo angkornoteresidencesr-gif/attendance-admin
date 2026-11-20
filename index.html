@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Staff Attendance</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #111827);
+    --hint: var(--tg-theme-hint-color, #6b7280);
+    --card: var(--tg-theme-secondary-bg-color, #f3f4f6);
+    --btn: var(--tg-theme-button-color, #2563eb);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --ok: #16a34a;
+    --late: #dc2626;
+    --warn: #d97706;
+    --line: rgba(127,127,127,.28);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+  button { font-family: inherit; }
+  .card { width: 100%; max-width: 440px; background: var(--card); border-radius: 20px; padding: 24px 18px; text-align: center; }
+  .icon { font-size: 50px; line-height: 1; margin-bottom: 10px; }
+  .icon.spin { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.12); opacity: .6; } }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p.sub { margin: 0 0 14px; color: var(--hint); font-size: 15px; line-height: 1.45; white-space: pre-line; }
+  .notice { margin: 0 0 14px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 600; text-align: left;
+    background: rgba(217,119,6,.15); color: var(--warn); }
+  .rows { margin: 0 0 16px; text-align: left; border-radius: 12px; background: var(--bg); overflow: hidden; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 14px; font-size: 14px; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .row .k { color: var(--hint); }
+  .row .v { font-weight: 600; text-align: right; word-break: break-word; user-select: text; }
+  .tone-ok h1 { color: var(--ok); }
+  .tone-late h1, .tone-error h1 { color: var(--late); }
+  .tone-warn h1 { color: var(--warn); }
+
+  /* the steps */
+  .list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .sess { width: 100%; border: 2px solid var(--line); border-radius: 14px; padding: 14px 16px; background: var(--bg); color: var(--text);
+    font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .sess .st { display: block; font-size: 12px; font-weight: 500; color: var(--hint); margin-top: 2px; }
+  .sess .tm { font-size: 14px; font-weight: 600; color: var(--ok); white-space: nowrap; }
+  .sess .qr { font-size: 22px; opacity: .85; }
+  .sess.next { background: var(--btn); border-color: var(--btn); color: var(--btn-text); }
+  .sess.next .st { color: var(--btn-text); opacity: .85; }
+  .sess.done { opacity: .75; cursor: default; }
+  .sess:active:not(:disabled) { transform: scale(.98); }
+
+  /* quick actions + links */
+  .quick { display: flex; gap: 10px; margin-bottom: 10px; }
+  .quick button { flex: 1; padding: 13px 8px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg);
+    color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; }
+  .links { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+  .link { border: 0; background: none; color: var(--btn); font-size: 14px; padding: 9px; cursor: pointer; }
+  .typebox { margin: 0 0 10px; }
+  .typebox input { width: 100%; padding: 13px; font-size: 17px; text-align: center; border-radius: 12px; text-transform: uppercase;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  .typebox p { color: var(--hint); font-size: 13px; margin: 6px 0 0; }
+
+  button.main { width: 100%; border: 0; border-radius: 14px; padding: 16px; font-size: 17px; font-weight: 600; background: var(--btn);
+    color: var(--btn-text); cursor: pointer; margin-top: 4px; }
+  pre.debug { margin: 0 0 14px; padding: 10px 12px; text-align: left; font-size: 12px; white-space: pre-wrap; word-break: break-word;
+    background: var(--bg); color: var(--hint); border-radius: 10px; user-select: text; }
+  .status { width: 100%; max-width: 440px; margin-top: 12px; font-size: 12px; text-align: center; color: var(--hint); word-break: break-word; }
+  .status.good { color: var(--ok); }
+  .status.bad { color: var(--late); }
+
+  /* dialogs */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+  .sheet { width: 100%; max-width: 480px; max-height: 90vh; overflow: auto; background: var(--bg); color: var(--text); text-align: left;
+    border-radius: 20px 20px 0 0; padding: 20px 18px calc(18px + env(safe-area-inset-bottom, 0px)); }
+  .sheet h2 { margin: 0 0 4px; font-size: 20px; }
+  .sheet .hint { color: var(--hint); font-size: 14px; margin: 0 0 12px; white-space: pre-line; }
+  .sheet .lbl { display: block; font-size: 13px; font-weight: 700; color: var(--hint); margin: 12px 0 6px; }
+  .sheet input[type=text], .sheet input[type=number], .sheet input[type=date] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text);
+    font-size: 14px; font-weight: 700; cursor: pointer; }
+  .chip.on { background: var(--btn); border-color: var(--btn); color: var(--btn-text); }
+  .preview { margin-top: 10px; font-size: 14px; color: var(--warn); font-weight: 600; }
+  .two { display: flex; gap: 10px; }
+  .two > div { flex: 1; min-width: 0; }
+  .row-btns { display: flex; gap: 10px; margin-top: 18px; }
+  .act { flex: 1; border: 0; border-radius: 14px; padding: 15px 10px; font-size: 16px; font-weight: 700; background: var(--btn); color: var(--btn-text); cursor: pointer; }
+  .act:disabled { opacity: .5; }
+  .act.secondary { background: var(--card); color: var(--text); border: 1px solid var(--line); }
+  .err { color: var(--late); font-size: 14px; margin-top: 12px; }
+  .req { padding: 12px; border-radius: 14px; background: var(--card); margin-bottom: 10px; }
+  .req .rt { font-weight: 700; font-size: 15px; word-break: break-word; }
+  .req .rs { color: var(--hint); font-size: 13px; margin-top: 3px; word-break: break-word; }
+  .req .rb { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+  .pill { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .pill.Pending { background: rgba(217,119,6,.18); color: var(--warn); }
+  .pill.Approved, .pill.Notified { background: rgba(22,163,74,.15); color: var(--ok); }
+  .pill.Declined { background: rgba(220,38,38,.15); color: var(--late); }
+  .pill.Cancelled { background: rgba(127,127,127,.2); color: var(--hint); }
+  .small-btn { border: 1px solid var(--line); background: var(--bg); color: var(--late); border-radius: 10px; padding: 7px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card" id="card">
+    <div class="icon" id="icon">📍</div>
+    <h1 id="title">Staff Attendance</h1>
+    <p class="sub" id="text">Loading…</p>
+    <div class="notice" id="notice" hidden></div>
+    <div class="list" id="list" hidden></div>
+    <div class="typebox" id="typeBox" hidden>
+      <input id="qrInput" type="text" autocomplete="off" autocapitalize="characters" placeholder="ATT-XXXXXXXXXX">
+      <p>Type the text of the office QR code, then tap one of the steps above.</p>
+    </div>
+    <div class="quick" id="quick" hidden>
+      <button id="qLate">⏰ I'll be late</button>
+      <button id="qOff">🌴 Day off request</button>
+    </div>
+    <div class="rows" id="rows" hidden></div>
+    <pre class="debug" id="debug" hidden></pre>
+    <button class="main" id="btn" hidden></button>
+    <div class="links" id="links" hidden>
+      <button class="link" id="lnkReq">📋 My requests</button>
+      <button class="link" id="lnkType">⌨️ Type the QR code instead of scanning</button>
+      <button class="link" id="lnkHome">📲 Add a shortcut to my home screen</button>
+    </div>
+  </div>
+  <div class="status" id="status" hidden></div>
+</main>
+
+<div class="overlay" id="overlay" hidden><div class="sheet" id="sheet"></div></div>
+
+<script>
+/* ======================== SETTINGS (edit these) ======================== */
+const API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';  // full URL ending in /exec
+const DEBUG = true;            // true = show technical details on errors. Set to false when everything works.
+const PAGE_VERSION = 'v10';
+const API_TIMEOUT_MS = 30000;
+const GOOD_ACCURACY_M = 25;    // stop waiting for a better GPS fix once accuracy is this good
+const GPS_WAIT_MS = 15000;
+/* ======================================================================== */
+
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const $ = function (id) { return document.getElementById(id); };
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+let busy = false;
+let state = null;        // latest state from the server
+let handler = null;      // what the big bottom button does
+let lastStep = null;
+let lastQr = '';
+let typeOpen = false;
+
+const STEP_NAME = { 'Check-In': 'Check In', 'Break Out': 'Lunch Break', 'Break In': 'Back from Lunch', 'Check-Out': 'Check Out' };
+
+/* ---------------- 12-hour helpers (for the live "expected arrival" preview) ---------------- */
+function parse12(t) {
+  const m = String(t || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return null;
+  let h = Number(m[1]) % 12;
+  if (/pm/i.test(m[3])) h += 12;
+  return h * 3600 + Number(m[2]) * 60;
+}
+function fmt12(sec) {
+  sec = ((Math.round(sec) % 86400) + 86400) % 86400;
+  let h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return h + ':' + ('0' + m).slice(-2) + ' ' + ap;
+}
+function addDays(iso, n) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/* ---------------------------------- main card ---------------------------------- */
+/** o.sessions = steps, o.quick = {late: label|false}, o.home = show quick/links, o.notice = amber line. */
+function render(o) {
+  $('icon').textContent = o.icon || '📍';
+  $('icon').className = 'icon' + (o.spin ? ' spin' : '');
+  $('title').textContent = o.title || '';
+  $('text').textContent = o.text || '';
+  $('card').className = 'card' + (o.tone ? ' tone-' + o.tone : '');
+
+  const nt = $('notice');
+  if (o.notice) { nt.textContent = o.notice; nt.hidden = false; } else { nt.hidden = true; }
+
+  const list = $('list');
+  list.innerHTML = '';
+  if (o.sessions) {
+    o.sessions.forEach(function (s) {
+      const b = el('button', 'sess' + (s.done ? ' done' : '') + (s.type === o.next ? ' next' : ''));
+      b.disabled = !!s.done;
+      const left = el('span', '', s.label);
+      const sub = s.done ? s.status : (s.hint || '');
+      if (sub) left.appendChild(el('span', 'st', sub));
+      b.appendChild(left);
+      b.appendChild(el('span', s.done ? 'tm' : 'qr', s.done ? '✅ ' + s.time : '🔳'));
+      if (!s.done) b.addEventListener('click', function () { startStep(s.type); });
+      list.appendChild(b);
+    });
+    list.hidden = false;
+  } else {
+    list.hidden = true;
+  }
+
+  const home = !!o.home;
+  $('typeBox').hidden = !(home && typeOpen);
+  $('quick').hidden = !home;
+  $('links').hidden = !home;
+  if (home) {
+    const q = o.quick || {};
+    $('qLate').hidden = !q.late;
+    $('qLate').textContent = q.late || '';
+    $('lnkType').hidden = !(state && state.allowTypeQr && o.sessions && !state.allDone);
+    $('lnkHome').hidden = !(tg && typeof tg.addToHomeScreen === 'function');
+    $('lnkReq').textContent = '📋 My requests' + (state && state.pendingRequests ? ' (' + state.pendingRequests + ' pending)' : '');
+  }
+
+  const rowsEl = $('rows');
+  rowsEl.innerHTML = '';
+  if (o.rows && o.rows.length) {
+    o.rows.forEach(function (r) {
+      const row = el('div', 'row');
+      row.appendChild(el('span', 'k', r[0]));
+      row.appendChild(el('span', 'v', r[1]));
+      rowsEl.appendChild(row);
+    });
+    rowsEl.hidden = false;
+  } else {
+    rowsEl.hidden = true;
+  }
+
+  const dbg = $('debug');
+  if (o.debug && DEBUG) { dbg.textContent = o.debug; dbg.hidden = false; } else { dbg.hidden = true; }
+
+  const btn = $('btn');
+  btn.hidden = !o.button;
+  btn.textContent = o.button || '';
+  btn.disabled = false;
+  handler = o.onClick || null;
+}
+$('btn').addEventListener('click', function () { if (handler) handler(); });
+
+function setStatus(ok, text) {
+  if (!DEBUG) return;
+  const s = $('status');
+  s.hidden = false;
+  s.className = 'status ' + (ok ? 'good' : 'bad');
+  s.textContent = text;
+}
+function shortUrl() {
+  const u = API_URL.replace(/^https?:\/\//, '');
+  return u.length > 46 ? u.slice(0, 28) + '…' + u.slice(-14) : u;
+}
+function haptic(type) { try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type); } catch (e) {} }
+function closeApp() { if (tg && tg.close) tg.close(); }
+
+/* ---------------------------------- Apps Script API ---------------------------------- */
+function apiError(kind, message) { const e = new Error(message); e.kind = kind; return e; }
+
+async function callApi(payload) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(function () { ctrl.abort(); }, API_TIMEOUT_MS);
+  let raw;
+  try {
+    // No custom headers on purpose: keeps it a "simple" request so the browser does not block it (CORS).
+    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ initData: tg.initData }, payload)), signal: ctrl.signal });
+    raw = await res.text();
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw apiError('TIMEOUT', 'No answer from the server after ' + (API_TIMEOUT_MS / 1000) + ' seconds.');
+    throw apiError('NETWORK', 'Request blocked or server unreachable (' + (e && e.message ? e.message : e) + ').');
+  } finally {
+    clearTimeout(timer);
+  }
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (e) { throw apiError('BAD_REPLY', 'Server did not return data. It replied: ' + raw.replace(/\s+/g, ' ').slice(0, 160)); }
+  if (!data || typeof data !== 'object') throw apiError('BAD_REPLY', 'Unexpected reply from server.');
+  return data;
+}
+
+function showApiError(err, retry) {
+  haptic('error');
+  let text = 'Could not reach the server. Check your internet and try again. If it keeps failing, tell your manager.';
+  if (err.kind === 'TIMEOUT') text = 'The server took too long to answer. Check your internet and try again.';
+  if (err.kind === 'BAD_REPLY') text = 'The server sent an unexpected reply. The admin needs to deploy a new version of the Apps Script.';
+  setStatus(false, 'Page ' + PAGE_VERSION + ' · Server NOT reachable ❌ — ' + err.message);
+  render({ icon: '📶', tone: 'warn', title: 'Connection problem', text: text, button: 'Try Again', onClick: retry,
+           debug: (err.message || String(err)) + '\nAPI: ' + shortUrl() + '\nPage ' + PAGE_VERSION });
+}
+
+/* ---------------------------------- GPS (only if Settings says Require Location = YES) ---------------------------------- */
+function getTelegramLocation() {
+  return new Promise(function (resolve) {
+    const lm = tg && tg.LocationManager;
+    if (!lm || !tg.isVersionAtLeast || !tg.isVersionAtLeast('8.0')) return resolve(null);
+    let done = false;
+    function finish(v) { if (!done) { done = true; resolve(v); } }
+    setTimeout(function () { finish(null); }, 25000);
+    function request() {
+      if (!lm.isLocationAvailable) return finish(null);
+      lm.getLocation(function (loc) {
+        if (!loc) return finish(null);
+        finish({ lat: loc.latitude, lng: loc.longitude, accuracy: loc.horizontal_accuracy || null });
+      });
+    }
+    if (lm.isInited) request(); else lm.init(request);
+  });
+}
+
+function getBrowserLocation() {
+  return new Promise(function (resolve, reject) {
+    if (!navigator.geolocation) return reject({ code: 0 });
+    let best = null, settled = false, watchId, timer;
+    function finish() {
+      if (settled) return;
+      settled = true;
+      navigator.geolocation.clearWatch(watchId);
+      clearTimeout(timer);
+      if (best) resolve(best); else reject({ code: 3 });
+    }
+    timer = setTimeout(finish, GPS_WAIT_MS);
+    watchId = navigator.geolocation.watchPosition(
+      function (pos) {
+        const c = pos.coords;
+        const fix = { lat: c.latitude, lng: c.longitude, accuracy: c.accuracy };
+        if (!best || fix.accuracy < best.accuracy) best = fix;
+        if (fix.accuracy <= GOOD_ACCURACY_M) finish();
+      },
+      function (err) {
+        if (best) return finish();
+        settled = true;
+        navigator.geolocation.clearWatch(watchId);
+        clearTimeout(timer);
+        reject(err);
+      },
+      { enableHighAccuracy: true, timeout: GPS_WAIT_MS, maximumAge: 0 }
+    );
+  });
+}
+
+async function getPosition() {
+  const viaTelegram = await getTelegramLocation();
+  if (viaTelegram) return viaTelegram;
+  return getBrowserLocation();
+}
+
+function showLocationError(err) {
+  haptic('error');
+  const denied = err && err.code === 1;
+  render({
+    icon: denied ? '🔒' : '📡', tone: 'warn',
+    title: denied ? 'Location permission needed' : 'Could not get your location',
+    text: denied
+      ? 'Please allow location for Telegram: open your phone Settings > Telegram > Location, choose "While Using" and turn on Precise Location. Then try again.'
+      : 'Make sure GPS / Location is switched on, then try again. Standing near a window or outside the door helps.',
+    button: 'Try Again', onClick: function () { submitStep(lastStep, lastQr); }
+  });
+}
+
+/* ---------------------------------- home screen ---------------------------------- */
+function renderState(st, notice) {
+  state = st;
+  const shiftLine = 'Shift: ' + st.shiftName + ' (' + st.shiftStart + ' – ' + st.shiftEnd + ')' + (st.hasBreak ? '' : ' · no break');
+  const info = st.dateText + '\n' + [st.position, shiftLine].filter(Boolean).join('\n');
+  const head = (notice ? notice + '\n\n' : '') + info;
+  const ln = st.lateNotice;
+  const noticeText = ln ? '📝 Late notice sent: ' + ln.minutes + ' min · expected about ' + ln.expected : '';
+  const lateLabel = (!st.off && !st.checkedIn && !st.allDone) ? (ln ? '⏰ Update late notice' : "⏰ I'll be late") : false;
+
+  if (st.off) {
+    render({ icon: '🌴', tone: 'warn', title: 'Hello, ' + st.name + '!',
+             text: head + '\n\nToday is marked as your day off (' + st.offReason + ').',
+             home: true, quick: { late: false } });
+    return;
+  }
+  if (st.allDone) {
+    render({ icon: '🎉', tone: 'ok', title: 'All done for today', text: head, sessions: st.sessions, next: '',
+             home: true, quick: { late: false } });
+    return;
+  }
+  render({ icon: '📍', title: 'Hello, ' + st.name + '!', text: head, sessions: st.sessions, next: st.next,
+           notice: noticeText, home: true, quick: { late: lateLabel } });
+}
+
+async function loadState() {
+  render({ icon: '⏳', spin: true, title: 'Loading…', text: 'Getting your attendance for today.' });
+  try {
+    const res = await callApi({ action: 'state' });
+    setStatus(true, 'Page ' + PAGE_VERSION + ' · Server connected ✅');
+    if (res.ok) return renderState(res.state);
+    if (res.code === 'NOT_REGISTERED') return showNotRegistered(res);
+    haptic('error');
+    render({ icon: res.code === 'INACTIVE' ? '🚫' : '🔄', tone: 'warn',
+             title: res.code === 'INACTIVE' ? 'Account inactive' : 'Please reopen',
+             text: res.message || 'Please try again.', debug: res.code || '',
+             button: res.code === 'INACTIVE' ? '' : 'Try Again', onClick: loadState });
+  } catch (err) {
+    showApiError(err, loadState);
+  }
+}
+
+function showNotRegistered(res) {
+  render({ icon: '🔒', tone: 'warn', title: 'Not registered yet',
+           text: 'Please send this Telegram ID to your manager so they can add you:',
+           rows: [['Your Telegram ID', String(res.userId)]] });
+}
+
+/* ---------------------------------- scan the office QR code ---------------------------------- */
+function scannerAvailable() {
+  return !!(tg && typeof tg.showScanQrPopup === 'function' && tg.isVersionAtLeast && tg.isVersionAtLeast('6.4'));
+}
+
+function startStep(type) {
+  if (busy) return;
+  lastStep = type;
+  const typed = ($('qrInput').value || '').trim();
+  if (typeOpen && typed) { $('qrInput').value = ''; submitStep(type, typed); return; }
+  openScanner(type);
+}
+
+function scannerUnsupported() {
+  if (state && state.allowTypeQr) {
+    typeOpen = true;
+    renderState(state, '📷 The QR scanner is not available here. Type the QR text below, then tap a step.');
+    $('qrInput').focus();
+    return;
+  }
+  render({ icon: '📷', tone: 'warn', title: 'QR scanner not available',
+           text: 'Use Telegram on your phone (latest version) to scan the office QR code.',
+           button: 'OK', onClick: function () { renderState(state); } });
+}
+
+function openScanner(type) {
+  if (!scannerAvailable()) return scannerUnsupported();
+  let handled = false;
+  try {
+    tg.showScanQrPopup({ text: STEP_NAME[type] + ' - scan the office QR code' }, function (text) {
+      if (handled) return true;
+      handled = true;
+      setTimeout(function () { submitStep(type, text); }, 80);
+      return true;                        // true = close the scanner
+    });
+  } catch (e) {
+    scannerUnsupported();
+  }
+}
+
+async function submitStep(type, qr) {
+  if (busy) return;
+  busy = true;
+  lastStep = type;
+  lastQr = qr;
+
+  let pos = null;
+  if (state && state.requireLocation) {
+    render({ icon: '🛰️', spin: true, title: 'Getting your location…', text: 'Keep Telegram open. This takes a few seconds.' });
+    try { pos = await getPosition(); }
+    catch (err) { busy = false; return showLocationError(err); }
+  }
+  render({ icon: '⏳', spin: true, title: 'Verifying…', text: 'Checking the QR code, your location and shift time.' });
+  try {
+    const res = await callApi({ action: 'log', session: type, qr: qr,
+                                lat: pos ? pos.lat : null, lng: pos ? pos.lng : null, accuracy: pos ? pos.accuracy : null });
+    busy = false;
+    showLogResult(res);
+  } catch (err) {
+    busy = false;
+    showApiError(err, function () { submitStep(type, qr); });
+  }
+}
+
+function timelineRows(st) {
+  return st.sessions.filter(function (s) { return s.done; }).map(function (s) { return [s.label, s.time + ' · ' + s.status]; });
+}
+
+function showLogResult(res) {
+  if (res.ok) {
+    const e = res.entry;
+    state = res.state;
+    haptic(e.tone === 'late' ? 'warning' : 'success');
+    render({
+      icon: e.tone === 'late' ? '⏰' : (e.tone === 'warn' ? '🟠' : '✅'),
+      tone: e.tone, title: 'Recorded!',
+      text: e.card + ' at ' + e.time + '\nStatus: ' + e.status + (e.note ? ' (' + e.note + ')' : '') +
+            (e.notice ? '\n📝 ' + e.notice : '') +
+            (e.lunchMinutes !== null && e.lunchMinutes !== undefined ? '\nLunch length: ' + e.lunchMinutes + ' min' : '') +
+            (e.warning ? '\n⚠️ ' + e.warning : ''),
+      rows: timelineRows(res.state).concat(e.distance !== '' ? [['Distance', e.distance + ' m']] : []),
+      button: 'Close', onClick: closeApp
+    });
+    return;
+  }
+  haptic('error');
+  const again = function () { submitStep(lastStep, lastQr); };
+  switch (res.code) {
+    case 'BAD_QR':
+      render({ icon: '🔳', tone: 'error', title: 'Wrong QR code', text: res.message,
+               button: 'Scan Again', onClick: function () { renderState(state); startStep(lastStep); } });
+      break;
+    case 'QR_NOT_SET':
+      render({ icon: '🛠️', tone: 'warn', title: 'QR code not ready', text: res.message,
+               button: 'Back', onClick: function () { renderState(state); } });
+      break;
+    case 'OUT_OF_BOUNDS':
+      render({ icon: '❌', tone: 'error', title: 'Out of range', text: res.message,
+               rows: [['Your distance', res.distance + ' m'], ['Allowed', res.radius + ' m']],
+               button: 'Try Again', onClick: again });
+      break;
+    case 'LOW_ACCURACY':
+      render({ icon: '📡', tone: 'warn', title: 'GPS signal too weak',
+               text: res.message + ' Turn on Precise Location, move near a window or outside, then try again.',
+               button: 'Try Again', onClick: again });
+      break;
+    case 'TOO_SOON':
+      render({ icon: '⏱️', tone: 'warn', title: 'Please wait a moment', text: res.message,
+               button: 'Back', onClick: function () { renderState(state); } });
+      break;
+    case 'ALREADY_RECORDED':
+      renderState(res.state, 'ℹ️ ' + res.message);
+      break;
+    case 'OFF_TODAY':
+      render({ icon: '🌴', tone: 'warn', title: 'Day off today', text: res.message,
+               button: 'Back', onClick: function () { renderState(state); } });
+      break;
+    case 'NOT_REGISTERED':
+      showNotRegistered(res);
+      break;
+    case 'AUTH_FAILED':
+    case 'SESSION_EXPIRED':
+      render({ icon: '🔄', tone: 'warn', title: 'Please reopen', text: res.message, debug: res.code });
+      break;
+    default:
+      render({ icon: '⚠️', tone: 'error', title: 'Something went wrong', text: res.message || 'Please try again.',
+               button: 'Back', onClick: function () { state ? renderState(state) : loadState(); }, debug: res.code || '' });
+  }
+}
+
+/* ---------------------------------- dialogs ---------------------------------- */
+function openSheet(build) {
+  const sh = $('sheet');
+  sh.innerHTML = '';
+  build(sh);
+  $('overlay').hidden = false;
+}
+function closeSheet() { $('overlay').hidden = true; }
+$('overlay').addEventListener('click', function (e) { if (e.target === $('overlay') && !busy) closeSheet(); });
+
+function showSheetError(msg) { const e = $('sheetErr'); if (e) { e.textContent = msg; e.hidden = false; } }
+function setSheetBusy(b, label) { const a = $('sheetApply'); if (a) { a.disabled = b; a.textContent = b ? 'Sending…' : label; } }
+
+function buttonsRow(sh, label) {
+  const err = el('div', 'err'); err.id = 'sheetErr'; err.hidden = true;
+  sh.appendChild(err);
+  const row = el('div', 'row-btns');
+  const cancel = el('button', 'act secondary', 'Cancel');
+  cancel.onclick = closeSheet;
+  const apply = el('button', 'act', label);
+  apply.id = 'sheetApply';
+  row.appendChild(cancel);
+  row.appendChild(apply);
+  sh.appendChild(row);
+  return apply;
+}
+
+/* ---- I will be late ---- */
+function openLateDialog() {
+  if (!state || state.off || state.checkedIn) return;
+  const existing = state.lateNotice;
+  const startSec = parse12(state.shiftStart);
+  openSheet(function (sh) {
+    sh.appendChild(el('h2', '', existing ? '⏰ Update late notice' : "⏰ I'll be late"));
+    sh.appendChild(el('p', 'hint', 'Your shift starts at ' + state.shiftStart + '. The group will be told how many minutes you will be late.'));
+
+    sh.appendChild(el('label', 'lbl', 'How many minutes late?'));
+    const chips = el('div', 'chips');
+    [10, 15, 20, 30, 45, 60, 90].forEach(function (m) {
+      const c = el('button', 'chip', m + ' min');
+      c.type = 'button';
+      c.addEventListener('click', function () { setMinutes(m); });
+      chips.appendChild(c);
+    });
+    sh.appendChild(chips);
+
+    const num = document.createElement('input');
+    num.type = 'number'; num.id = 'fMin'; num.min = '1'; num.max = '240'; num.placeholder = 'or type minutes';
+    num.value = existing ? existing.minutes : '';
+    num.style.marginTop = '10px';
+    num.addEventListener('input', preview);
+    sh.appendChild(num);
+
+    const pv = el('div', 'preview'); pv.id = 'fPreview';
+    sh.appendChild(pv);
+
+    sh.appendChild(el('label', 'lbl', 'Reason (optional)'));
+    const why = document.createElement('input');
+    why.type = 'text'; why.id = 'fReason'; why.maxLength = 140; why.placeholder = 'e.g. traffic, family';
+    why.value = existing ? existing.reason : '';
+    sh.appendChild(why);
+
+    function setMinutes(m) { num.value = String(m); preview(); }
+    function preview() {
+      const m = Number(num.value);
+      const ok = isFinite(m) && m >= 1 && m <= 240;
+      pv.textContent = (ok && startSec !== null) ? 'Expected arrival: about ' + fmt12(startSec + m * 60) : '';
+      Array.from(chips.children).forEach(function (c) { c.className = 'chip' + (c.textContent === m + ' min' ? ' on' : ''); });
+    }
+    preview();
+
+    buttonsRow(sh, 'Send to group').onclick = async function () {
+      const m = Number(num.value);
+      if (!isFinite(m) || m < 1 || m > 240) { showSheetError('Enter how many minutes late you will be (1 to 240).'); return; }
+      if (busy) return;
+      busy = true; setSheetBusy(true, 'Send to group'); $('sheetErr').hidden = true;
+      try {
+        const res = await callApi({ action: 'request_late', minutes: m, reason: why.value });
+        busy = false;
+        if (res.ok) {
+          closeSheet(); haptic('success');
+          state = res.state;
+          render({ icon: '⏰', tone: 'ok', title: res.updated ? 'Late notice updated' : 'Late notice sent',
+                   text: 'The group was told you will be ' + res.minutes + ' min late.\nExpected arrival: about ' + res.expected + '.\n\nWhen you arrive, scan the office QR code to check in.',
+                   button: 'OK', onClick: function () { renderState(state); } });
+          return;
+        }
+        haptic('error'); setSheetBusy(false, 'Send to group'); showSheetError(res.message || 'Could not send the notice.');
+      } catch (e) { busy = false; setSheetBusy(false, 'Send to group'); showSheetError('Connection problem: ' + e.message); }
+    };
+  });
+}
+
+/* ---- Day off request ---- */
+function openDayOffDialog() {
+  if (!state) return;
+  const todayIso = state.todayIso;
+  openSheet(function (sh) {
+    sh.appendChild(el('h2', '', '🌴 Day off request'));
+    sh.appendChild(el('p', 'hint', 'The admin will approve or decline. The group is told when you ask and when the admin decides.'));
+
+    const two = el('div', 'two');
+    const a = el('div'); a.appendChild(el('label', 'lbl', 'First day'));
+    const d1 = document.createElement('input'); d1.type = 'date'; d1.id = 'fFrom'; d1.min = todayIso; d1.value = addDays(todayIso, 1);
+    a.appendChild(d1);
+    const b = el('div'); b.appendChild(el('label', 'lbl', 'Last day (optional)'));
+    const d2 = document.createElement('input'); d2.type = 'date'; d2.id = 'fTo'; d2.min = todayIso;
+    b.appendChild(d2);
+    two.appendChild(a); two.appendChild(b);
+    sh.appendChild(two);
+
+    sh.appendChild(el('label', 'lbl', 'Reason (optional)'));
+    const why = document.createElement('input');
+    why.type = 'text'; why.id = 'fReason'; why.maxLength = 140; why.placeholder = 'e.g. family event, appointment';
+    sh.appendChild(why);
+
+    buttonsRow(sh, 'Send request').onclick = async function () {
+      if (!d1.value) { showSheetError('Please choose the first day.'); return; }
+      if (busy) return;
+      busy = true; setSheetBusy(true, 'Send request'); $('sheetErr').hidden = true;
+      try {
+        const res = await callApi({ action: 'request_dayoff', from: d1.value, to: d2.value || d1.value, reason: why.value });
+        busy = false;
+        if (res.ok) {
+          closeSheet(); haptic('success');
+          render({ icon: '🙋', tone: 'ok', title: 'Request sent',
+                   text: res.text + (res.days > 1 ? '' : '') + '\n\nThe group was told. You will see the answer in "My requests".',
+                   rows: [['Request', res.id], ['Status', 'Pending']],
+                   button: 'OK', onClick: loadState });
+          return;
+        }
+        haptic('error'); setSheetBusy(false, 'Send request'); showSheetError(res.message || 'Could not send the request.');
+      } catch (e) { busy = false; setSheetBusy(false, 'Send request'); showSheetError('Connection problem: ' + e.message); }
+    };
+  });
+}
+
+/* ---- My requests ---- */
+function renderRequests(sh, list) {
+  const box = $('reqBox');
+  box.innerHTML = '';
+  if (!list.length) { box.appendChild(el('p', 'hint', 'No requests yet.')); return; }
+  list.forEach(function (r) {
+    const item = el('div', 'req');
+    item.appendChild(el('div', 'rt', (r.type === 'Late' ? '⏰ ' : '🌴 ') + r.text));
+    if (r.reason) item.appendChild(el('div', 'rs', 'Reason: ' + r.reason));
+    if (r.adminNote) item.appendChild(el('div', 'rs', '💬 Admin: ' + r.adminNote));
+    if (r.decidedBy && r.type === 'Day Off' && r.status !== 'Pending' && r.status !== 'Cancelled') item.appendChild(el('div', 'rs', 'Decided by ' + r.decidedBy));
+    const rb = el('div', 'rb');
+    rb.appendChild(el('span', 'pill ' + r.status, r.status === 'Notified' ? 'Sent' : r.status));
+    if (r.type === 'Day Off' && r.status === 'Pending') {
+      const c = el('button', 'small-btn', 'Cancel request');
+      c.addEventListener('click', async function () {
+        c.disabled = true;
+        try {
+          const res = await callApi({ action: 'cancel_request', id: r.id });
+          if (res.ok) { renderRequests(sh, res.requests); state.pendingRequests = Math.max(0, (state.pendingRequests || 0) - 1); haptic('success'); }
+          else { c.disabled = false; alert(res.message || 'Could not cancel.'); }
+        } catch (e) { c.disabled = false; alert('Connection problem: ' + e.message); }
+      });
+      rb.appendChild(c);
+    }
+    item.appendChild(rb);
+    box.appendChild(item);
+  });
+}
+
+async function openRequests() {
+  openSheet(function (sh) {
+    sh.appendChild(el('h2', '', '📋 My requests'));
+    sh.appendChild(el('p', 'hint', 'Your late notices and day-off requests.'));
+    const box = el('div'); box.id = 'reqBox';
+    box.appendChild(el('p', 'hint', 'Loading…'));
+    sh.appendChild(box);
+    const row = el('div', 'row-btns');
+    const close = el('button', 'act secondary', 'Close');
+    close.onclick = function () { closeSheet(); renderState(state); };
+    row.appendChild(close);
+    sh.appendChild(row);
+  });
+  try {
+    const res = await callApi({ action: 'my_requests' });
+    if (res.ok) renderRequests($('sheet'), res.requests);
+    else $('reqBox').textContent = res.message || 'Could not load your requests.';
+  } catch (e) { $('reqBox').textContent = 'Connection problem: ' + e.message; }
+}
+
+/* ---------------------------------- wiring ---------------------------------- */
+$('qLate').addEventListener('click', openLateDialog);
+$('qOff').addEventListener('click', openDayOffDialog);
+$('lnkReq').addEventListener('click', openRequests);
+$('lnkType').addEventListener('click', function () {
+  typeOpen = !typeOpen;
+  renderState(state);
+  if (typeOpen) $('qrInput').focus();
+});
+$('lnkHome').addEventListener('click', function () {
+  try { tg.addToHomeScreen(); } catch (e) { alert('Open the menu (⋯) at the top of this window and choose "Add to Home Screen".'); }
+});
+
+(function init() {
+  if (!tg || !tg.initData) {
+    render({ icon: '📵', tone: 'warn', title: 'Open from Telegram',
+             text: 'This page only works inside Telegram. Open it from your attendance bot.' });
+    return;
+  }
+  if (API_URL.indexOf('https://script.google.com/') !== 0) {
+    render({ icon: '🛠️', tone: 'error', title: 'Not configured',
+             text: 'API_URL at the top of index.html must be your Apps Script Web App URL (starting with https://script.google.com/ and ending in /exec).' });
+    return;
+  }
+  loadState();
+})();
+</script>
+</body>
+</html>
